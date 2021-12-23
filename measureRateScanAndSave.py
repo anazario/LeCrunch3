@@ -196,25 +196,16 @@ if __name__ == '__main__':
 
     if options.nevents < 1:
         sys.exit("Arguments to -n must be positive")
-
-    motors = motion.motion(port='COM3')
-    time.sleep(1)
-    motors.moveFor(-500,-500)
-
-    motors.moveTo(initialX, initialY)
-    motors.setHome()
-
+    
+    #create directory to store output, returns error if directory already exists
     dirname = options.outfile.replace('.txt','')
     if os.path.isdir(f'{dirname}'):
        sys.exit(f"Scan instance with name {dirname} already exists!")
     else:
        os.system(f"md .\{dirname}\hdf5")
        print(f'Saving output to directory {dirname}/')
-    
-    f = open(dirname+"/"+options.outfile, "w")
-    f.write('x\ty\trates\n')
-
-    #save details of scan as a dict in a json file
+       
+    #save general details of scan as a dict in a json file
     d = {'nTrig':options.nevents,
          'xMaxIdx':xSteps-1,
          'yMaxIdx':ySteps-1,
@@ -224,6 +215,16 @@ if __name__ == '__main__':
          'yMax':yMax}
     json.dump(d, open(f"{dirname}/{dirname}_info.json",'w'))
     
+    motors = motion.motion(port='COM3')
+    time.sleep(1)
+    motors.moveFor(-500,-500)
+
+    motors.moveTo(initialX, initialY)
+    motors.setHome()
+
+    f = open(dirname+"/"+options.outfile, "w")
+    f.write('x\ty\trates\n')
+
     try:
         for x in xes:
             xidx = list(xes).index(x)
