@@ -72,19 +72,19 @@ def measure(f, nevents, nsequence, ip, timeout=10000):
     for channel in channels:
         wave_desc = scope.get_wavedesc(channel)
         current_dim[channel] = wave_desc['wave_array_count']//sequence_count
-        f.create_dataset(f'c{channel}_samples', (nevents,current_dim[channel]), dtype=wave_desc['dtype'], maxshape=(nevents,None))
+        f.create_dataset(f'ch{channel}_samples', (nevents,current_dim[channel]), dtype=wave_desc['dtype'], maxshape=(nevents,None))
         ## Save attributes in the file
         for key, value in wave_desc.items():
             try:
-                f["c%i_samples"%channel].attrs[key] = value
+                f[f"ch{channel}_samples"].attrs[key] = value
             except ValueError:
                 pass
-        f.create_dataset("c%i_vert_offset"%channel, (nevents,), dtype='f8')
-        f.create_dataset("c%i_vert_scale"%channel, (nevents,), dtype='f8')
-        f.create_dataset("c%i_horiz_offset"%channel, (nevents,), dtype='f8')
-        f.create_dataset("c%i_horiz_scale"%channel, (nevents,), dtype='f8')
-        f.create_dataset("c%i_trig_offset"%channel, (nevents,), dtype='f8')
-        f.create_dataset("c%i_trig_time"%channel, (nevents,), dtype='f8')
+        f.create_dataset(f'ch{channel}_vert_offset', (nevents,), dtype='f8')
+        f.create_dataset(f'ch{channel}_vert_scale', (nevents,), dtype='f8')
+        f.create_dataset(f'ch{channel}_horiz_offset', (nevents,), dtype='f8')
+        f.create_dataset(f'ch{channel}_horiz_scale', (nevents,), dtype='f8')
+        f.create_dataset(f'ch{channel}_trig_offset', (nevents,), dtype='f8')
+        f.create_dataset(f'ch{channel}_trig_time', (nevents,), dtype='f8')
 
         # Add here all measurements you want...
         minimum[channel] = []
@@ -111,19 +111,19 @@ def measure(f, nevents, nsequence, ip, timeout=10000):
                     scratch = np.zeros((current_dim[channel],),dtype=wave_array.dtype)
                     for n in range(0,sequence_count):
                         scratch[0:num_samples] = traces[n]
-                        f[f'c{channel}_samples'][i+n] = scratch
-                        f['c%i_vert_offset'%channel][i+n] = wave_desc['vertical_offset']
-                        f['c%i_vert_scale'%channel][i+n] = wave_desc['vertical_gain']
-                        f['c%i_horiz_offset'%channel][i+n] = wave_desc['horiz_offset']
-                        f['c%i_horiz_scale'%channel][i+n] = wave_desc['horiz_interval']
-                        f['c%i_trig_offset'%channel][i+n] = trg_offsets[n]
-                        f['c%i_trig_time'%channel][i+n] = trg_times[n]
+                        f[f'ch{channel}_samples'][i+n] = scratch
+                        f[f'ch{channel}_vert_offset'][i+n] = wave_desc['vertical_offset']
+                        f[f'ch{channel}_vert_scale'][i+n] = wave_desc['vertical_gain']
+                        f[f'ch{channel}_horiz_offset'][i+n] = wave_desc['horiz_offset']
+                        f[f'ch{channel}_horiz_scale'][i+n] = wave_desc['horiz_interval']
+                        f[f'ch{channel}_trig_offset'][i+n] = trg_offsets[n]
+                        f[f'ch{channel}_trig_time'][i+n] = trg_times[n]
 
                         # Add here all measurements you want...
                         samples = -wave_desc['vertical_offset'] + scratch*wave_desc['vertical_gain']
                         if np.abs(np.max(samples) - np.min(samples)) > 12*np.std(samples[:100]):
                             filt_trg_times.append(trg_times[n])
-                    rate[channel].append( np.mean(np.diff(filt_trg_times)) )
+                    rate[channel].append(np.mean(np.diff(filt_trg_times)))
                     
             except Exception as e:
                 logging.error('Error\n' + str(e))
@@ -146,17 +146,21 @@ def measure(f, nevents, nsequence, ip, timeout=10000):
     scope.clear()
     
     for channel in channels:
+        rate_val = -999.
         if len(maximum[channel])>1:
-            logging.debug(f'Channel {channel}:\t Avg rate: {np.mean(rate[channel]):.3e} Hz')
+            rate_val = 1./np.mean(rate[channel])
+            logging.debug(f'Channel {channel}:\t Avg rate: {rate_val:.3e} Hz')
             print(f'Channel {channel}:')
-            print(f'\tAvg rate: {np.mean(rate[channel]):.3e} Hz')
+            print(f'\tAvg rate: {rate_val:.3e} Hz')
             print('')
+            
         else:
-            logging.debug(f'Channel {channel}:\t Avg rate: {rate[channel][0]:.3e} Hz')
+            rate_val = 1./np.mean(rate[channel][0])
+            logging.debug(f'Channel {channel}:\t Avg rate: {rate_val:.3e} Hz')
             print(f'Channel {channel}:', end='\t')
-            print(f'Avg rate: {rate[channel][0]:.3e} Hz')
+            print(f'Avg rate: {rate_val:.3e} Hz')
             print('')
-
+        
     return rate
 
 if __name__ == '__main__':
@@ -201,11 +205,11 @@ if __name__ == '__main__':
     motors.setHome()
 
     dirname = options.outfile.replace('.txt','')
-    if(os.path.isdir(f'{dirname}'):
+    if os.path.isdir(f'{dirname}'):
        sys.exit(f"Scan instance with name {dirname} already exists!")
     else:
-       os.system(f'mkdir -p {dirname}/hdf5')
-    print(f'Saving output to directory {dirname}/')
+       os.system(f"md .\{dirname}\hdf5")
+       print(f'Saving output to directory {dirname}/')
     
     f = open(dirname+"/"+options.outfile, "w")
     f.write('x\ty\trates\n')
@@ -213,7 +217,11 @@ if __name__ == '__main__':
     #save details of scan as a dict in a json file
     d = {'nTrig':options.nevents,
          'xMaxIdx':xSteps-1,
-         'yMaxIdx':ySteps-1}
+         'yMaxIdx':ySteps-1,
+         'xMin':xMin,
+         'yMin':yMin,
+         'xMax':xMax,
+         'yMax':yMax}
     json.dump(d, open(f"{dirname}/{dirname}_info.json",'w'))
     
     try:
@@ -235,9 +243,14 @@ if __name__ == '__main__':
                 
                 rates = measure(h5f, options.nevents, options.nevents, options.ip)
                 for c,r in rates.items():
-                    f.write(f'{r[0]}\t')
+                    rate_val = r[0]
+                    h5f.create_dataset(f'ch{c}_rate', (1,), dtype='f8')
+                    if rate_val != 0:
+                        rate_val = 1./rate_val
+                    h5f[f'ch{c}_rate'][0] = rate_val
+                    f.write(f'{rate_val}\t')
                 f.write('\n')
-                    
+                
     except Exception as e: 
         logging.error('Error 3\n' + str(e))
     finally:
