@@ -44,6 +44,7 @@ def measure(nevents, nsequence, ip, timeout=1000):
     channels = scope.get_channels()
     settings = scope.get_settings()
 
+    rms = {}
     minimum = {}
     maximum = {}
     rate = {}
@@ -58,8 +59,7 @@ def measure(nevents, nsequence, ip, timeout=1000):
         print('Could not configure sequence mode properly')
     if sequence_count != 1:
         print(f'Using sequence mode with {sequence_count} traces per aquisition')
-    
-   
+       
     current_dim = {}
     
     for channel in channels:
@@ -69,6 +69,7 @@ def measure(nevents, nsequence, ip, timeout=1000):
         # Add here all measurements you want...
         minimum[channel] = []
         maximum[channel] = []
+        rms[channel] = []
         rate[channel] = []
 
     try:
@@ -85,15 +86,17 @@ def measure(nevents, nsequence, ip, timeout=1000):
 
                     if current_dim[channel] < num_samples:
                         current_dim[channel] = num_samples
-                    # traces = wave_array.reshape(sequence_count, wave_array.size//sequence_count)
+                   
+                    traces = wave_array.reshape(sequence_count, wave_array.size//sequence_count)
                     #necessary because h5py does not like indexing and this is the fastest (and man is it slow) way
-                    # scratch = np.zeros((current_dim[channel],),dtype=wave_array.dtype)
-                    # for n in range(0,sequence_count):
-                    #     scratch[0:num_samples] = traces[n] 
+                    scratch = np.zeros((current_dim[channel],),dtype=wave_array.dtype)
+                    for n in range(0,sequence_count):
+                        scratch[0:num_samples] = traces[n] 
 
-                    #     # Add here all measurements you want...
-                    #     minimum[channel].append( np.min(-wave_desc['vertical_offset'] + scratch*wave_desc['vertical_gain']) )
-                    #     maximum[channel].append( np.max(-wave_desc['vertical_offset'] + scratch*wave_desc['vertical_gain']) )
+                        # Add here all measurements you want...
+                        rms[channel].append(np.std(-wave_desc['vertical_offset'] + scratch*wave_desc['vertical_gain']))
+                        minimum[channel].append( np.min(-wave_desc['vertical_offset'] + scratch*wave_desc['vertical_gain']) )
+                        maximum[channel].append( np.max(-wave_desc['vertical_offset'] + scratch*wave_desc['vertical_gain']) )    
                     rate[channel].append( np.mean(np.diff(trg_times)) )
                     
             except (socket.error, struct.error) as e:
@@ -110,10 +113,16 @@ def measure(nevents, nsequence, ip, timeout=1000):
         for channel in channels:
             if len(maximum[channel])>1:
                 print(f'Channel {channel}:')
+                print(f'\tRMS: {np.mean(rms[channel])*1000:.3} mV')
+                print(f'\tMinimum Mean: {np.mean(minimum[channel])*1000:.3} mV')
+                print(f'\tMaximum Mean: {np.mean(maximum[channel])*1000:.3} mV')
                 print(f'\tAvg rate: {np.mean(rate[channel]):.3e} Hz')
                 print('')
             else:
                 print(f'Channel {channel}:')
+                print(f'\tRMS: {rms[channel][0]*1000:.3} mV')
+                print(f'\tMinimum Mean: {minimum[channel][0]*1000:.3} mV')
+                print(f'\tMaximum Mean: {maximum[channel][0]*1000:.3} mV')
                 print(f'\tAvg rate: {rate[channel][0]:.3e} Hz')
                 print('')
 
