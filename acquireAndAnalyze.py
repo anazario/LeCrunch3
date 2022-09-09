@@ -142,10 +142,11 @@ def fetchAndSaveFast(filename, nevents, nsequence, ip, reference_ch, timeout=100
                         time = time_end - time_begin
                         sample_freq = num_samples/(time)
                         horiz_scale = wave_desc['horiz_interval']
-
-                        if np.abs(np.max(samples) - np.min(samples)) > 12*np.std(samples[:100]):
+                        rms_val = np.std(samples[:int(0.3*num_samples)])
+                        
+                        if np.abs(np.max(samples) - np.min(samples)) > 12*rms_val):
                             filt_trg_times.append(trg_times[n])
-                        rms[channel].append(np.std(samples))
+                        rms[channel].append(rms_val)
                         minimum[channel].append(np.min(samples))
                         maximum[channel].append(np.max(samples))
 
@@ -157,7 +158,7 @@ def fetchAndSaveFast(filename, nevents, nsequence, ip, reference_ch, timeout=100
 
                         try:
                             if minimum[channel][n] < -0.025:
-                                cfd_times[channel].append(CFD.cfd(samples,0.001,int(20*sample_freq))*horiz_scale+trg_offsets[n])
+                                cfd_times[channel].append(CFD.cfd(samples, 8*rms_val, int(20*sample_freq))*horiz_scale+trg_offsets[n])
                             else:
                                 cfd_times[channel].append(None)
                         except:
@@ -182,7 +183,7 @@ def fetchAndSaveFast(filename, nevents, nsequence, ip, reference_ch, timeout=100
                 temp_time_diff = []
                 for n in range(nevents):
                     dut_time = np.array(cfd_times[channel])
-                    time_diff[channel] = np.subtract(dut_time, ref_time)
+                    time_diff[channel] = subtract_nan(dut_time, ref_time)
                     f.create_dataset(f'ch{channel}_time_diff', data = time_diff[channel])
             else:
                 time_diff[channel] = np.zeros(len(cfd_times[channel]))
