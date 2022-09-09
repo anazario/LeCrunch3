@@ -1,7 +1,7 @@
 import numpy as np
 import h5py
 
-def cfd(voltage, threshold=0.02, base_line=200, fraction=0.3, hysteresis=0.05, chooseFirst=True):
+def cfd(voltage, threshold=0.02, base_line=30, fraction=0.3, hysteresis=0.001, chooseFirst=True):
     samples = voltage.astype(float)
     #print(base_line*sample_rate)
     # If peak2peak < threshold there is no peak for sure...
